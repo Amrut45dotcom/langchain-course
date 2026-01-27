@@ -9,7 +9,7 @@ from langchain.tools import tool
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 from langchain_tavily import TavilySearch
-
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 class Source(BaseModel):
     """Schema for a source used by the agent"""
@@ -26,7 +26,7 @@ class AgentResponse(BaseModel):
     )
 
 
-llm = ChatOpenAI(model="gpt-5")
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
 tools = [TavilySearch()]
 agent = create_agent(model=llm, tools=tools, response_format=AgentResponse)
 
@@ -36,7 +36,7 @@ def main():
     result = agent.invoke(
         {
             "messages": HumanMessage(
-                content="search for 3 job postings for an ai engineer using langchain in the bay area on linkedin and list their details?"
+                content="search for 3 job postings for an ai engineer using langchain in India on linkedin and list their details?"
             )
         }
     )
