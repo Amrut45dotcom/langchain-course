@@ -1,65 +1,50 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
+
 from dotenv import load_dotenv
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnableParallel
+from langchain_core.runnables import RunnableParallel, RunnableBranch, RunnableLambda
+from langchain_core.output_parsers import PydanticOutputParser
+from pydantic import BaseModel, Field
+from typing import Literal
 
 load_dotenv()
 
-model1 = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
-
-model2 = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
-
-prompt1 = PromptTemplate(
-    template='Generate short and simple notes from the following text \n {text}',
-    input_variables=['text']
-)
-
-prompt2 = PromptTemplate(
-    template='Generate 5 interview level short question answers from the following text \n {text}',
-    input_variables=['text']
-)
-
-prompt3 = PromptTemplate(
-    template='Merge the provided notes and quiz into a single document \n notes -> {notes} and quiz -> {quiz}',
-    input_variables=['notes', 'quiz']
-)
+model = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
 
 parser = StrOutputParser()
 
-parallel_chain = RunnableParallel({
-    'notes': prompt1 | model1 | parser,
-    'quiz': prompt2 | model2 | parser
-})
+class Feedback(BaseModel):
 
-merge_chain = prompt3 | model1 | parser
+    sentiment: Literal['positive', 'negative'] = Field(description='Give the sentiment of the feedback')
 
-chain = parallel_chain | merge_chain
+parser2 = PydanticOutputParser(pydantic_object=Feedback)
 
-text = """
-Support vector machines (SVMs) are a set of supervised learning methods used for classification, regression and outliers detection.
+prompt1 = PromptTemplate(
+    template='Classify the sentiment of the following feedback text into postive or negative \n {feedback} \n {format_instruction}',
+    input_variables=['feedback'],
+    partial_variables={'format_instruction':parser2.get_format_instructions()}
+)
 
-The advantages of support vector machines are:
+classifier_chain = prompt1 | model | parser2
 
-Effective in high dimensional spaces.
+prompt2 = PromptTemplate(
+    template='Write an appropriate response to this positive feedback \n {feedback}',
+    input_variables=['feedback']
+)
 
-Still effective in cases where number of dimensions is greater than the number of samples.
+prompt3 = PromptTemplate(
+    template='Write an appropriate response to this negative feedback \n {feedback}',
+    input_variables=['feedback']
+)
 
-Uses a subset of training points in the decision function (called support vectors), so it is also memory efficient.
+branch_chain = RunnableBranch(
+    (lambda x:x.sentiment == 'positive', prompt2 | model | parser),
+    (lambda x:x.sentiment == 'negative', prompt3 | model | parser),
+    RunnableLambda(lambda x: "could not find sentiment")
+)
 
-Versatile: different Kernel functions can be specified for the decision function. Common kernels are provided, but it is also possible to specify custom kernels.
+chain = classifier_chain | branch_chain
 
-The disadvantages of support vector machines include:
+print(chain.invoke({'feedback': 'This is a beautiful phone'}))
 
-If the number of features is much greater than the number of samples, avoid over-fitting in choosing Kernel functions and regularization term is crucial.
-
-SVMs do not directly provide probability estimates, these are calculated using an expensive five-fold cross-validation (see Scores and probabilities, below).
-
-The support vector machines in scikit-learn support both dense (numpy.ndarray and convertible to that by numpy.asarray) and sparse (any scipy.sparse) sample vectors as input. However, to use an SVM to make predictions for sparse data, it must have been fit on such data. For optimal performance, use C-ordered numpy.ndarray (dense) or scipy.sparse.csr_matrix (sparse) with dtype=float64.
-"""
-
-result = chain.invoke({'text':text})
-
-print(result)
-
-chain.get_graph().print_ascii()
