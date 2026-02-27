@@ -3,7 +3,7 @@ from typing import List
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage, ToolMessage
 from langchain.tools import tool, BaseTool
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 from callbacks import AgentCallbackHandler
 
@@ -32,7 +32,7 @@ if __name__ == "__main__":
     print("Hello LangChain Tools (.bind_tools)!")
     tools = [get_text_length]
 
-    llm = ChatOpenAI(
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash",
         temperature=0,
         callbacks=[AgentCallbackHandler()],
     )
